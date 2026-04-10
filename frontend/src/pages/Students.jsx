@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, Plus, Building2, Clock, FileText, ChevronRight, Trash2 } from 'lucide-react'
+import { Search, Plus, Building2, Clock, FileText, ChevronRight, Trash2, FileSpreadsheet } from 'lucide-react'
 import { listStudents, deleteStudent } from '../api'
 import StatusBadge from '../components/StatusBadge'
+import ExportModal from '../components/ExportModal'
 
 const TABS = [
   { value: '', label: 'All' },
@@ -16,6 +17,7 @@ export default function Students() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('')
   const [search, setSearch] = useState('')
+  const [showExport, setShowExport] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -41,10 +43,16 @@ export default function Students() {
           <h1 className="text-2xl font-bold text-slate-800">Students</h1>
           <p className="text-slate-500 text-sm mt-1">{students.length} student{students.length !== 1 ? 's' : ''} found</p>
         </div>
-        <Link to="/students/new" className="btn-primary">
-          <Plus size={16} />
-          Add Student
-        </Link>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowExport(true)} className="btn-secondary">
+            <FileSpreadsheet size={15} className="text-emerald-600" />
+            Export Excel
+          </button>
+          <Link to="/students/new" className="btn-primary">
+            <Plus size={16} />
+            Add Student
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}
@@ -170,6 +178,8 @@ export default function Students() {
           })}
         </div>
       )}
+
+      {showExport && <ExportModal onClose={() => setShowExport(false)} />}
     </div>
   )
 }

@@ -371,6 +371,107 @@ def list_students(status: Optional[str] = None, search: Optional[str] = None, pe
     return students
 
 
+@router.get("/students/export")
+def export_students(
+    columns: str = "",
+    semester: Optional[str] = None,
+    year: Optional[str] = None,
+):
+    """Generate an Excel file with selected columns and optional cohort filters."""
+    import io
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    ALL_COLUMNS = {
+        "name":                 "Full Name",
+        "student_id":           "Student ID",
+        "email":                "Email",
+        "status":               "Status",
+        "cohort":               "Cohort",
+        "internship_company":   "Company",
+        "internship_position":  "Position",
+        "internship_start":     "Start Date",
+        "internship_end":       "End Date",
+        "total_hours_required": "Hours Required",
+        "total_hours_completed":"Hours Completed",
+        "linkedin":             "LinkedIn",
+        "notes":                "Notes",
+    }
+
+    requested = [c.strip() for c in columns.split(",") if c.strip()] if columns else list(ALL_COLUMNS.keys())
+    cols = [c for c in requested if c in ALL_COLUMNS]
+    if not cols:
+        cols = list(ALL_COLUMNS.keys())
+
+    # Fetch students
+    conn = get_db()
+    c = conn.cursor()
+    query = "SELECT * FROM students WHERE 1=1"
+    params = []
+    if semester:
+        query += " AND cohort LIKE ?"; params.append(f"{semester}%")
+    if year:
+        query += " AND cohort LIKE ?"; params.append(f"% {year}")
+    query += " ORDER BY name ASC"
+    c.execute(query, params)
+    students = [dict(r) for r in c.fetchall()]
+    for s in students:
+        c.execute("SELECT COALESCE(SUM(hours_completed),0) FROM monthly_progress WHERE student_id=?", (s["id"],))
+        s["total_hours_completed"] = c.fetchone()[0]
+    conn.close()
+
+    # Build workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Students"
+
+    BLUE     = "2563EB"
+    ALT_BLUE = "EFF6FF"
+    thin = Side(style="thin", color="CBD5E1")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    # Header row
+    for ci, key in enumerate(cols, 1):
+        cell = ws.cell(row=1, column=ci, value=ALL_COLUMNS[key])
+        cell.font      = Font(bold=True, color="FFFFFF", size=11)
+        cell.fill      = PatternFill("solid", fgColor=BLUE)
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border    = border
+    ws.row_dimensions[1].height = 22
+
+    # Data rows
+    for ri, student in enumerate(students, 2):
+        fill = PatternFill("solid", fgColor=ALT_BLUE) if ri % 2 == 0 else None
+        for ci, key in enumerate(cols, 1):
+            val = student.get(key) or ""
+            cell = ws.cell(row=ri, column=ci, value=str(val) if val != "" else "")
+            cell.alignment = Alignment(vertical="center")
+            cell.border    = border
+            if fill:
+                cell.fill = fill
+
+    # Auto column widths
+    for ci, key in enumerate(cols, 1):
+        header_len = len(ALL_COLUMNS[key])
+        max_data   = max((len(str(s.get(key) or "")) for s in students), default=0)
+        ws.column_dimensions[get_column_letter(ci)].width = min(max(header_len, max_data) + 4, 50)
+
+    # Freeze header row
+    ws.freeze_panes = "A2"
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    fname = f"students_{semester or 'all'}_{year or 'all'}.xlsx"
+    return Response(
+        content=buf.read(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
 @router.post("/students")
 def create_student(student: StudentCreate):
     conn = get_db()
