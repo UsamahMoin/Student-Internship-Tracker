@@ -355,8 +355,8 @@ def list_students(status: Optional[str] = None, search: Optional[str] = None, pe
     if status:
         query += " AND status=?"; params.append(status)
     if search:
-        query += " AND (name LIKE ? OR email LIKE ? OR internship_company LIKE ? OR university LIKE ?)"
-        params.extend([f"%{search}%"] * 4)
+        query += " AND (name LIKE ? OR student_id LIKE ? OR email LIKE ? OR internship_company LIKE ? OR university LIKE ?)"
+        params.extend([f"%{search}%"] * 5)
     if pending:
         query += " AND id IN (SELECT DISTINCT student_id FROM monthly_progress WHERE submission_status='pending')"
     query += " ORDER BY name ASC"
@@ -410,7 +410,10 @@ def export_students(
     query = "SELECT * FROM students WHERE 1=1"
     params = []
     if semester:
-        query += " AND cohort LIKE ?"; params.append(f"{semester}%")
+        semesters = [s.strip() for s in semester.split(",") if s.strip()]
+        if semesters:
+            query += " AND (" + " OR ".join(["cohort LIKE ?"] * len(semesters)) + ")"
+            params.extend([f"{s}%" for s in semesters])
     if year:
         query += " AND cohort LIKE ?"; params.append(f"% {year}")
     query += " ORDER BY name ASC"
@@ -651,11 +654,14 @@ def generate_report(student_id: int):
 def save_email_config(config: EmailConfigCreate):
     conn = get_db()
     c = conn.cursor()
+    c.execute("SELECT smtp_password FROM email_config WHERE id=1")
+    existing = c.fetchone()
+    password = config.smtp_password or (existing["smtp_password"] if existing else "")
     c.execute(
         """INSERT OR REPLACE INTO email_config
            (id,smtp_host,smtp_port,smtp_user,smtp_password,sender_name,updated_at)
            VALUES (1,?,?,?,?,?,CURRENT_TIMESTAMP)""",
-        (config.smtp_host, config.smtp_port, config.smtp_user, config.smtp_password, config.sender_name),
+        (config.smtp_host, config.smtp_port, config.smtp_user, password, config.sender_name),
     )
     conn.commit(); conn.close()
     return {"message": "Email config saved"}
@@ -688,8 +694,10 @@ def send_reminder(student_id: int, body: Optional[ReminderRequest] = None):
         raise HTTPException(400, "Student has no email address")
 
     now = datetime.now()
-    req_month = body.month if body and body.month else now.month
-    req_year  = body.year  if body and body.year  else now.year
+    req_month = body.month if body and body.month is not None else now.month
+    req_year  = body.year  if body and body.year is not None else now.year
+    if req_month < 1 or req_month > 12:
+        raise HTTPException(400, "Month must be between 1 and 12")
     month_str = f"{MONTHS_LONG[req_month - 1]} {req_year}"
     missing   = body.missing_items if body and body.missing_items else []
 

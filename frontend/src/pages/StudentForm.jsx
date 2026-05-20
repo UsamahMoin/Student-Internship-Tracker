@@ -15,6 +15,7 @@ const YEARS = Array.from({ length: 6 }, (_, i) => currentYear - 1 + i)
 
 const EMPTY = {
   name: '', student_id: '', email: '', cohort_semester: 'Fall',
+  phone: '', university: '', program: '',
   cohort_year: String(currentYear), status: 'active',
   internship_company: '', internship_position: '',
   internship_start: '', internship_end: '', total_hours_required: 320,
@@ -42,6 +43,9 @@ export default function StudentForm() {
         name: data.name || '',
         student_id: data.student_id || '',
         email: data.email || '',
+        phone: data.phone || '',
+        university: data.university || '',
+        program: data.program || '',
         cohort_semester,
         cohort_year,
         status: data.status || 'active',
@@ -125,6 +129,21 @@ export default function StudentForm() {
               <label className="label">Email</label>
               <input type="email" className="input" placeholder="student@university.edu" value={form.email}
                 onChange={e => set('email', e.target.value)} />
+            </div>
+            <div>
+              <label className="label">Phone</label>
+              <input className="input" placeholder="(555) 123-4567" value={form.phone}
+                onChange={e => set('phone', e.target.value)} />
+            </div>
+            <div>
+              <label className="label">University</label>
+              <input className="input" placeholder="State University" value={form.university}
+                onChange={e => set('university', e.target.value)} />
+            </div>
+            <div className="col-span-2">
+              <label className="label">Program</label>
+              <input className="input" placeholder="Computer Science" value={form.program}
+                onChange={e => set('program', e.target.value)} />
             </div>
             <div>
               <label className="label">Semester</label>

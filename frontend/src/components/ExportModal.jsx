@@ -48,7 +48,7 @@ export default function ExportModal({ onClose }) {
     try {
       const params = new URLSearchParams()
       params.set('columns', [...selected].join(','))
-      if (semesters.size === 1) params.set('semester', [...semesters][0])
+      if (semesters.size > 0) params.set('semester', [...semesters].join(','))
       if (year) params.set('year', year)
 
       const res = await fetch(`/api/students/export?${params}`)
@@ -176,7 +176,6 @@ export default function ExportModal({ onClose }) {
 
             {GROUPS.map(group => {
               const groupCols = COLUMNS.filter(c => c.group === group)
-              const allGroupSelected = groupCols.every(c => selected.has(c.key))
               return (
                 <div key={group} className="mb-4">
                   <div className="flex items-center justify-between mb-2">
